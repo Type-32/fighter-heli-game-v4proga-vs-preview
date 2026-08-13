@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>战斗直升机模拟器</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0f0c; }
+    #app canvas { display: block; }
+    .hidden { display: none !important; }
+    #hud { position: fixed; inset: 0; pointer-events: none; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace; color: #8dffb0; }
+    .panel { position: absolute; background: rgba(8, 26, 14, 0.5); border: 1px solid rgba(120, 255, 160, 0.35); padding: 8px 12px; font-size: 13px; line-height: 1.65; letter-spacing: 0.5px; text-shadow: 0 0 5px rgba(90, 255, 140, 0.6); }
+    .tl { top: 14px; left: 14px; }
+    .tr { top: 14px; right: 14px; text-align: right; }
+    .bl { bottom: 14px; left: 14px; width: 220px; }
+    .br { bottom: 14px; right: 14px; text-align: right; }
+    .hint { bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #7ecf96; border: none; background: none; text-shadow: 0 0 4px rgba(90, 255, 140, 0.4); }
+    .bar { width: 100%; height: 8px; background: rgba(120, 255, 160, 0.15); border: 1px solid rgba(120, 255, 160, 0.4); margin: 3px 0; }
+    .bar > div { height: 100%; background: #5dff8e; transition: width 0.12s linear; }
+    .label { font-size: 11px; color: #9adfae; }
+    #msg { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); font-size: 22px; letter-spacing: 4px; color: #ffd76a; text-shadow: 0 0 12px rgba(255, 200, 60, 0.8); opacity: 0; transition: opacity 0.3s; white-space: nowrap; }
+    #msg.show { opacity: 1; }
+    #dmg-flash { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0) 40%, rgba(255, 40, 0, 0.55) 100%); opacity: 0; }
+    #reticle { position: fixed; inset: 0; pointer-events: none; }
+    .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(5, 12, 8, 0.82); z-index: 10; }
+    .box { max-width: 660px; padding: 34px 44px; border: 1px solid rgba(120, 255, 160, 0.4); background: rgba(10, 24, 14, 0.85); color: #c8ffd8; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .box h1 { font-size: 26px; letter-spacing: 6px; color: #8dffb0; margin-bottom: 6px; }
+    .box h2 { font-size: 13px; letter-spacing: 3px; color: #ffd76a; margin-bottom: 18px; font-weight: normal; }
+    .box table { font-size: 14px; line-height: 2.05; margin-bottom: 18px; }
+    .box td:first-child { color: #8dffb0; padding-right: 14px; white-space: nowrap; }
+    .box button { display: block; margin: 0 auto; padding: 12px 46px; font-size: 17px; letter-spacing: 8px; cursor: pointer; background: #1c4a2c; color: #d8ffe4; border: 1px solid #5dff8e; font-family: inherit; }
+    .box button:hover { background: #25633a; }
+    .score { text-align: center; font-size: 18px; color: #ffd76a; margin-top: 14px; letter-spacing: 2px; }
+    .tip { font-size: 12px; color: #9adfae; line-height: 1.8; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="hud" class="hidden">
+    <div class="panel tl">
+      速度 <span id="hud-speed">0</span> km/h<br />
+      高度 <span id="hud-alt">0</span> m<br />
+      爬升 <span id="hud-vs">0.0</span> m/s<br />
+      航向 <span id="hud-heading">000</span>&deg;
+    </div>
+    <div class="panel tr">
+      波次 <span id="hud-wave">1</span>/<span id="hud-maxwave">3</span><br />
+      剩余目标 <span id="hud-targets">0</span><br />
+      击毁 <span id="hud-kills">0</span> &nbsp;得分 <span id="hud-score">0</span>
+    </div>
+    <div class="panel bl">
+      <span class="label">机身状态</span> <span id="hp-text">100%</span>
+      <div class="bar" id="hp-bar"><div style="width:100%"></div></div>
+      <span class="label">总距</span>
+      <div class="bar" id="thr-bar"><div style="width:0%"></div></div>
+      <span class="label">旋翼转速</span>
+      <div class="bar" id="rpm-bar"><div style="width:0%"></div></div>
+    </div>
+    <div class="panel br">
+      火箭弹 <span id="ammo-rockets">38</span><br />
+      机炮 <span id="ammo-cannon">1200</span><br />
+      导弹 <span id="ammo-missiles">4</span>
+    </div>
+    <div class="panel hint">W/S 俯仰 · A/D 横滚 · Q/E 偏航 · Shift/空格 总距↑ · X 总距↓ · F 火箭 · 左键 机炮 · 右键 导弹锁定 · C 视角 · M 静音 · R 重开</div>
+    <div id="msg"></div>
+  </div>
+  <div id="dmg-flash"></div>
+  <canvas id="reticle"></canvas>
+  <div id="overlay" class="overlay">
+    <div class="box">
+      <h1>战斗直升机模拟器</h1>
+      <h2>AH-64 阿帕奇 · 攻击任务</h2>
+      <table>
+        <tr><td>W / S</td><td>俯仰 —— 机头下压前进 / 拉起后退</td></tr>
+        <tr><td>A / D</td><td>横滚 —— 左右侧移</td></tr>
+        <tr><td>Q / E</td><td>偏航 —— 左右转向</td></tr>
+        <tr><td>Shift / 空格</td><td>总距杆上提 —— 上升</td></tr>
+        <tr><td>X</td><td>总距杆下压 —— 下降</td></tr>
+        <tr><td>鼠标左键</td><td>机炮射击（沿准星方向）</td></tr>
+        <tr><td>F</td><td>火箭弹（沿瞄准方向）</td></tr>
+        <tr><td>鼠标右键</td><td>锁定目标并发射导弹</td></tr>
+        <tr><td>C</td><td>座舱 / 外部视角</td></tr>
+        <tr><td>M / R</td><td>静音 / 重新开始</td></tr>
+      </table>
+      <p class="tip">
+        任务：摧毁全部三波敌方装甲单位。敌方坦克与装甲车会向你开火，机身受损会冒烟。
+        总距杆控制升力，机头方向即前进方向——控制好姿态，祝飞行顺利。
+      </p>
+      <button id="start-btn">开 始 任 务</button>
+    </div>
+  </div>
+  <div id="overlay-end" class="overlay hidden">
+    <div class="box">
+      <h1 id="end-title">任务失败</h1>
+      <h2 id="end-sub">直升机被摧毁</h2>
+      <p class="score">得分 <span id="end-score">0</span> · 击毁 <span id="end-kills">0</span></p>
+      <button id="restart-btn">重 新 任 务</button>
+    </div>
+  </div>
+  <script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
