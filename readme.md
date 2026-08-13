@@ -4,7 +4,7 @@ Preview: https://opncd.ai/share/KBy65vpa
 
 I tested GA first then tested preview in the same folder with the GA's generated files removed.
 
-The oneshot of GA was significantly better than the oneshot of Preview. My prompt, translating to english, is "Make a realistic fighter helicopter". Both oneshot tests are entirely in Build mode of opencode.
+The oneshot of GA was significantly better than the oneshot of Preview. My prompt, translating to english, is "Make a realistic fighter helicopter". Both oneshot tests are entirely in Build mode of opencode, using Max thinking.
 
 GA was using official DeepSeek API provider platform, while Preview was using OpenRouter's DeepSeek v4 pro's preview model ver. (with the DeepSeek provider disabled in my OR account settings)
 
